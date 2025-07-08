@@ -36,12 +36,7 @@ contract NFTPoolBurnAndMint is CCIPReceiver, OwnerIsCreator {
     );
 
     // Event emitted when a message is received from another chain.
-    event MessageReceived(
-        bytes32 indexed messageId, // The unique ID of the CCIP message.
-        uint64 indexed sourceChainSelector, // The chain selector of the source chain.
-        address sender, // The address of the sender from the source chain.
-        string text // The text that was received.
-    );
+    event TokenMinted(uint256 tokenId, address newOwner);
 
     bytes32 private s_lastReceivedMessageId; // Store the last received messageId.
     string private s_lastReceivedText; // Store the last received text.
@@ -74,7 +69,8 @@ contract NFTPoolBurnAndMint is CCIPReceiver, OwnerIsCreator {
         _;
     }
 
-    function lockAndSendNFT(
+    // burn and send nft
+    function burnAndSendNFT(
         uint256 tokenId,
         address newOwner,
         uint64 chainSelector,
@@ -82,6 +78,9 @@ contract NFTPoolBurnAndMint is CCIPReceiver, OwnerIsCreator {
     ) public returns (bytes32) {
         // 1. transfer NFT to this address to lock the NFT
         wnft.transferFrom(msg.sender, address(this), tokenId);
+
+        // burn the wnft before send to ccip
+        wnft.burn(tokenId);
         // construct data to be sent
         bytes memory payload = abi.encode(tokenId, newOwner);
         bytes32 messageId = sendMessagePayLINK(
@@ -151,15 +150,7 @@ contract NFTPoolBurnAndMint is CCIPReceiver, OwnerIsCreator {
 
         wnft.mintTokenWithSpecificTokenId(newOwner, tokenId);
 
-        s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
-        s_lastReceivedText = abi.decode(any2EvmMessage.data, (string)); // abi-decoding of the sent text
-
-        emit MessageReceived(
-            any2EvmMessage.messageId,
-            any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
-            abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
-            abi.decode(any2EvmMessage.data, (string))
-        );
+        emit TokenMinted(tokenId, newOwner);
     }
 
     /// @notice Construct a CCIP message.
